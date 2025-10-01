@@ -9,8 +9,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-
 def load_parquet_files():
 
     con = None
