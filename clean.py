@@ -1,3 +1,13 @@
+"""
+Goals of this File:
+- Remove duplicates.
+- Remove trips with 0 passengers.
+- Remove 0-mile trips.
+- Remove trips longer than 100 miles.
+- Remove trips lasting > 24 hours or <= 0 duration.
+- Verify that all invalid conditions have been removed.
+"""
+
 import duckdb
 import logging
 import os
