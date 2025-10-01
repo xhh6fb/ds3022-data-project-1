@@ -16,7 +16,6 @@ def clean_trips():
     con = None
 
     try:
-        # Connect to DuckDB
         con = duckdb.connect(database='taxi_data.duckdb', read_only=False)
         logger.info("Connected to DuckDB instance")
 
@@ -25,7 +24,7 @@ def clean_trips():
         for table in trip_tables:
             logger.info(f"Cleaning table: {table}")
 
-            # Remove duplicate trips
+            # remove duplicate trips
             con.execute(f"""
                 DELETE FROM {table}
                 WHERE rowid NOT IN (
@@ -36,17 +35,17 @@ def clean_trips():
             """)
             logger.info(f"Removed duplicates from {table}")
 
-            # Remove trips with 0 passengers
+            # remove trips with 0 passengers
             con.execute(f"DELETE FROM {table} WHERE passenger_count <= 0")
 
-            # Remove trips with 0 miles
+            # remove trips with 0 miles
             con.execute(f"DELETE FROM {table} WHERE trip_distance <= 0")
 
-            # Remove trips longer than 100 miles
+            # remove trips longer than 100 miles
             con.execute(f"DELETE FROM {table} WHERE trip_distance > 100")
 
-            # Remove trips lasting more than 1 day
-            # Identify correct datetime columns depending on table
+            # remove trips lasting more than 1 day
+            # identify correct datetime columns depending on table
             pickup_col = "tpep_pickup_datetime" if "yellow" in table else "lpep_pickup_datetime"
             dropoff_col = "tpep_dropoff_datetime" if "yellow" in table else "lpep_dropoff_datetime"
 
@@ -55,9 +54,6 @@ def clean_trips():
                 WHERE EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) > 86400
             """)
 
-            # -----------------------------------------------------------------
-            # Verification queries
-            # -----------------------------------------------------------------
             dup_count = con.execute(f"""
                 SELECT COUNT(*) - COUNT(DISTINCT *) FROM {table}
             """).fetchone()[0]
@@ -69,7 +65,6 @@ def clean_trips():
                 WHERE EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) > 86400
             """).fetchone()[0]
 
-            # Log verification
             logger.info(f"Post-cleaning verification for {table}:")
             logger.info(f"Duplicate trips remaining: {dup_count}")
             logger.info(f"Trips with 0 passengers: {zero_passenger_count}")
@@ -77,7 +72,6 @@ def clean_trips():
             logger.info(f"Trips >100 miles: {long_miles_count}")
             logger.info(f"Trips >1 day duration: {long_duration_count}")
 
-            # Print verification to console as well
             print(f"\n=== {table} Post-Cleaning Verification ===")
             print(f"Duplicate trips remaining: {dup_count}")
             print(f"Trips with 0 passengers: {zero_passenger_count}")
