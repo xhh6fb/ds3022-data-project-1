@@ -1,3 +1,15 @@
+"""
+Goals of this File:
+- Report on...
+  1) Single largest CO2 trip (yellow/green).
+  2) Most/least carbon-heavy hours.
+  3) Most/least carbon-heavy days of week.
+  4) Most/least carbon-heavy weeks.
+  5) Most/least carbon-heavy months.
+- Render time-series plot with the month on the X-axis and CO2 totals on the Y-axis for yellow and green.
+- Save plot in PNG format and print output labels.
+"""
+
 import duckdb
 import pandas as pd
 import matplotlib.pyplot as plt
