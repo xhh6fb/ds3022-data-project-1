@@ -17,6 +17,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def setup_database():
+    try:
+        conn = duckdb.connect(database='taxi_data.duckdb', read_only=False)
+        logger.info("Connected to DuckDB instance")
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        raise
 
 def load_parquet_files():
 
