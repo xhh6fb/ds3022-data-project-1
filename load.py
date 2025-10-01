@@ -1,3 +1,11 @@
+"""
+Goal of this File:
+- Create a local DuckDB database with tables for yellow, green trips, and vehicle_emissions.
+- Download 2024 monthly parquet files for yellow and green taxis (programmatically).
+- Insert datasets into DuckDB and print raw row counts (pre-cleaning).
+- Log each operation and handle errors robustly.
+"""
+
 import duckdb
 import pandas as pd
 import os
@@ -8,6 +16,7 @@ logging.basicConfig(
     filename='load.log'
 )
 logger = logging.getLogger(__name__)
+
 
 def load_parquet_files():
 
