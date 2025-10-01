@@ -28,9 +28,9 @@ def setup_database():
 
 def load_parquet_files():
 
-    con = None
-
     try:
+        logging.info("Loading data")
+
         os.makedirs('data', exist_ok=True)
         os.makedirs('logs', exist_ok=True)
 
