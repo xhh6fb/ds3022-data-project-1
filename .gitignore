@@ -1,0 +1,10 @@
+*.log
+*.db
+*.duckdb
+
+*.parquet
+*.csv
+.DS_Store
+
+dbt/target/
+dbt/.user.yml
