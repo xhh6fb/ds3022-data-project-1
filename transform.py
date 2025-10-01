@@ -1,3 +1,9 @@
+"""
+Goals of this File:
+- Add derived columns for CO2 (kg), average mph, and time dimensions (hour, day, week, month).
+- Use runtime lookup from vehicle_emissions for co2_grams_per_mile (not hard-coded) to compute per-trip CO2.
+"""
+
 import duckdb
 import logging
 
