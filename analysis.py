@@ -13,8 +13,12 @@ Goals of this File:
 import duckdb
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+import matplotlib.ticker as ticker
 import logging
+import os
+
+os.makedirs('output', exist_ok=True)
+os.makedirs('logs', exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,298 +29,136 @@ logging.basicConfig(
     ]
 )
 
-def setup_database():
-    try:
-        con = duckdb.connect('taxi_data.duckdb', read_only=True)
-        logging.info("Database connection established")
-        return con
-    except Exception as e:
-        logging.error(f"Database setup failed: {e}")
-        raise
-
 def analyze_largest_carbon_trips(con):
     try:
-        logging.info("Analyzing largest carbon producing trips")
-        
-        # yellow taxi largest trip
-        yellow_max = con.execute("""
-            SELECT trip_distance, trip_co2_kgs, tpep_pickup_datetime, tpep_dropoff_datetime
-            FROM yellow_trips 
-            WHERE trip_co2_kgs = (SELECT MAX(trip_co2_kgs) FROM yellow_trips)
-            LIMIT 1
-        """).fetchone()
-        
-        # green taxi largest trip
-        green_max = con.execute("""
-            SELECT trip_distance, trip_co2_kgs, lpep_pickup_datetime, lpep_dropoff_datetime
-            FROM green_trips 
-            WHERE trip_co2_kgs = (SELECT MAX(trip_co2_kgs) FROM green_trips)
-            LIMIT 1
-        """).fetchone()
-        
-        logging.info(f"LARGEST CARBON TRIPS:")
-        logging.info(f"Yellow: {yellow_max[1]:.3f}kg CO2 ({yellow_max[0]:.1f} miles)")
-        logging.info(f"Green: {green_max[1]:.3f}kg CO2 ({green_max[0]:.1f} miles)")
-        
-        print("Largest Carbon Producing Trips of 2024:")
-        print(f"Yellow Taxi: {yellow_max[1]:.3f} kg CO2 ({yellow_max[0]:.1f} miles)")
-        print(f"Green Taxi: {green_max[1]:.3f} kg CO2 ({green_max[0]:.1f} miles)")
-        
-        return yellow_max, green_max
-        
-    except Exception as e:
-        logging.error(f"Failed to analyze largest trips: {e}")
-        raise
 
-def analyze_by_hour(con):
-    try:
-        logging.info("Analyzing emissions by hour of day")
-        
-        # yellow taxi by hour
-        yellow_hours = con.execute("""
-            SELECT hour_of_day, AVG(trip_co2_kgs) as avg_co2
-            FROM yellow_trips 
-            WHERE trip_co2_kgs IS NOT NULL
-            GROUP BY hour_of_day
-            ORDER BY hour_of_day
-        """).fetchall()
-        
-        # green taxi by hour
-        green_hours = con.execute("""
-            SELECT hour_of_day, AVG(trip_co2_kgs) as avg_co2
-            FROM green_trips 
-            WHERE trip_co2_kgs IS NOT NULL
-            GROUP BY hour_of_day
-            ORDER BY hour_of_day
-        """).fetchall()
-        
-        # finding the heaviest and lightest hours
-        yellow_heaviest = max(yellow_hours, key=lambda x: x[1])
-        yellow_lightest = min(yellow_hours, key=lambda x: x[1])
-        green_heaviest = max(green_hours, key=lambda x: x[1])
-        green_lightest = min(green_hours, key=lambda x: x[1])
-        
-        logging.info(f"EMISSIONS BY HOUR:")
-        logging.info(f"Yellow - Heaviest: Hour {yellow_heaviest[0]} ({yellow_heaviest[1]:.3f}kg)")
-        logging.info(f"Yellow - Lightest: Hour {yellow_lightest[0]} ({yellow_lightest[1]:.3f}kg)")
-        logging.info(f"Green - Heaviest: Hour {green_heaviest[0]} ({green_heaviest[1]:.3f}kg)")
-        logging.info(f"Green - Lightest: Hour {green_lightest[0]} ({green_lightest[1]:.3f}kg)")
-        
-        print("Carbon Emissions by Hour of Day:")
-        print(f"Yellow - Heaviest: Hour {yellow_heaviest[0]} ({yellow_heaviest[1]:.3f}kg avg)")
-        print(f"Yellow - Lightest: Hour {yellow_lightest[0]} ({yellow_lightest[1]:.3f}kg avg)")
-        print(f"Green - Heaviest: Hour {green_heaviest[0]} ({green_heaviest[1]:.3f}kg avg)")
-        print(f"Green - Lightest: Hour {green_lightest[0]} ({green_lightest[1]:.3f}kg avg)")
-        
-        return yellow_hours, green_hours
-        
-    except Exception as e:
-        logging.error(f"Failed to analyze by hour: {e}")
-        raise
+        for taxi_color in ['yellow', 'green']:
+            logger.info(f"Analyzing the largest carbon trips for {taxi_color}")
 
-def analyze_by_day_of_week(con):
-    try:
-        logging.info("Analyzing emissions by day of week")
-        
-        # yellow taxi by day of week (key: 0 is sunday, 6 is saturday)
-        yellow_days = con.execute("""
-            SELECT day_of_week, AVG(trip_co2_kgs) as avg_co2
-            FROM yellow_trips 
-            WHERE trip_co2_kgs IS NOT NULL
-            GROUP BY day_of_week
-            ORDER BY day_of_week
-        """).fetchall()
-        
-        # green taxi by day of week
-        green_days = con.execute("""
-            SELECT day_of_week, AVG(trip_co2_kgs) as avg_co2
-            FROM green_trips 
-            WHERE trip_co2_kgs IS NOT NULL
-            GROUP BY day_of_week
-            ORDER BY day_of_week
-        """).fetchall()
-        
-        day_names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-        
-        yellow_heaviest = max(yellow_days, key=lambda x: x[1])
-        yellow_lightest = min(yellow_days, key=lambda x: x[1])
-        green_heaviest = max(green_days, key=lambda x: x[1])
-        green_lightest = min(green_days, key=lambda x: x[1])
-        
-        logging.info(f"EMISSIONS BY DAY OF WEEK:")
-        logging.info(f"Yellow - Heaviest: {day_names[yellow_heaviest[0]]} ({yellow_heaviest[1]:.3f}kg)")
-        logging.info(f"Yellow - Lightest: {day_names[yellow_lightest[0]]} ({yellow_lightest[1]:.3f}kg)")
-        
-        print("Carbon Emissions by Day of Week:")
-        print(f"Yellow - Heaviest: {day_names[yellow_heaviest[0]]} ({yellow_heaviest[1]:.3f}kg avg)")
-        print(f"Yellow - Lightest: {day_names[yellow_lightest[0]]} ({yellow_lightest[1]:.3f}kg avg)")
-        print(f"Green - Heaviest: {day_names[green_heaviest[0]]} ({green_heaviest[1]:.3f}kg avg)")
-        print(f"Green - Lightest: {day_names[green_lightest[0]]} ({green_lightest[1]:.3f}kg avg)")
-        
-        return yellow_days, green_days
-        
-    except Exception as e:
-        logging.error(f"Failed to analyze by day of week: {e}")
-        raise
+            #largest trip in general
+            result = con.execute(f"""
+                SELECT pickup_datetime, trip_co2_kgs FROM transform_trips WHERE taxi_type = '{taxi_color}'
+                ORDER BY trip_co2_kgs 
+                DESC LIMIT 1;
+                """).fetchall()
+            print(f"The largest CO2 trip is {result}")
+            logger.info(f"The largest total CO2 trip for {taxi_color} taxi is {result}")
 
-def analyze_by_week(con):
-    try:
-        logging.info("Analyzing emissions by week of year")
-        
-        # yellow taxi by week
-        yellow_weeks = con.execute("""
-            SELECT week_of_year, AVG(trip_co2_kgs) as avg_co2
-            FROM yellow_trips 
-            WHERE trip_co2_kgs IS NOT NULL
-            GROUP BY week_of_year
-            ORDER BY week_of_year
-        """).fetchall()
-        
-        # green taxi by week
-        green_weeks = con.execute("""
-            SELECT week_of_year, AVG(trip_co2_kgs) as avg_co2
-            FROM green_trips 
-            WHERE trip_co2_kgs IS NOT NULL
-            GROUP BY week_of_year
-            ORDER BY week_of_year
-        """).fetchall()
-        
-        yellow_heaviest = max(yellow_weeks, key=lambda x: x[1])
-        yellow_lightest = min(yellow_weeks, key=lambda x: x[1])
-        green_heaviest = max(green_weeks, key=lambda x: x[1])
-        green_lightest = min(green_weeks, key=lambda x: x[1])
-        
-        logging.info(f"EMISSIONS BY WEEK:")
-        logging.info(f"Yellow - Heaviest: Week {yellow_heaviest[0]} ({yellow_heaviest[1]:.3f}kg)")
-        logging.info(f"Yellow - Lightest: Week {yellow_lightest[0]} ({yellow_lightest[1]:.3f}kg)")
-        
-        print("Carbon Emissions by Week of Year:")
-        print(f"Yellow - Heaviest: Week {yellow_heaviest[0]} ({yellow_heaviest[1]:.3f}kg avg)")
-        print(f"Yellow - Lightest: Week {yellow_lightest[0]} ({yellow_lightest[1]:.3f}kg avg)")
-        print(f"Green - Heaviest: Week {green_heaviest[0]} ({green_heaviest[1]:.3f}kg avg)")
-        print(f"Green - Lightest: Week {green_lightest[0]} ({green_lightest[1]:.3f}kg avg)")
-        
-        return yellow_weeks, green_weeks
-        
-    except Exception as e:
-        logging.error(f"Failed to analyze by week: {e}")
-        raise
+            #by hour
+            heaviest_hour = con.execute(f"""
+                SELECT trip_hour FROM transform_trips WHERE taxi_type = '{taxi_color}'
+                GROUP BY 1 ORDER BY AVG(trip_co2_kgs) DESC LIMIT 1;""").fetchone()[0]
+            print(f"The most carbon heavy hour for {taxi_color} taxis is {heaviest_hour}")
+            logger.info(f"The most carbon heavy hour for {taxi_color} taxis is {heaviest_hour}")
 
-def analyze_by_month(con):
-    try:
-        logging.info("Analyzing emissions by month")
-        
-        # yellow taxi by month
-        yellow_months = con.execute("""
-            SELECT month_of_year, SUM(trip_co2_kgs) as total_co2, AVG(trip_co2_kgs) as avg_co2
-            FROM yellow_trips 
-            WHERE trip_co2_kgs IS NOT NULL
-            GROUP BY month_of_year
-            ORDER BY month_of_year
-        """).fetchall()
-        
-        # green taxi by month
-        green_months = con.execute("""
-            SELECT month_of_year, SUM(trip_co2_kgs) as total_co2, AVG(trip_co2_kgs) as avg_co2
-            FROM green_trips 
-            WHERE trip_co2_kgs IS NOT NULL
-            GROUP BY month_of_year
-            ORDER BY month_of_year
-        """).fetchall()
-        
-        month_names = ['', 'January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December']
-        
-        yellow_heaviest = max(yellow_months, key=lambda x: x[2])
-        yellow_lightest = min(yellow_months, key=lambda x: x[2])
-        green_heaviest = max(green_months, key=lambda x: x[2])
-        green_lightest = min(green_months, key=lambda x: x[2])
-        
-        logging.info(f"EMISSIONS BY MONTH:")
-        logging.info(f"Yellow - Heaviest: {month_names[yellow_heaviest[0]]} ({yellow_heaviest[2]:.3f}kg avg)")
-        logging.info(f"Yellow - Lightest: {month_names[yellow_lightest[0]]} ({yellow_lightest[2]:.3f}kg avg)")
-        
-        print("Carbon Emissions by Month:")
-        print(f"Yellow - Heaviest: {month_names[yellow_heaviest[0]]} ({yellow_heaviest[2]:.3f}kg avg)")
-        print(f"Yellow - Lightest: {month_names[yellow_lightest[0]]} ({yellow_lightest[2]:.3f}kg avg)")
-        print(f"Green - Heaviest: {month_names[green_heaviest[0]]} ({green_heaviest[2]:.3f}kg avg)")
-        print(f"Green - Lightest: {month_names[green_lightest[0]]} ({green_lightest[2]:.3f}kg avg)")
-        
-        return yellow_months, green_months
-        
-    except Exception as e:
-        logging.error(f"Failed to analyze by month: {e}")
-        raise
+            lightest_hour = con.execute(f"""
+                SELECT trip_hour FROM transform_trips WHERE taxi_type = '{taxi_color}' 
+                GROUP BY 1 ORDER BY AVG(trip_co2_kgs) ASC LIMIT 1;""").fetchone()[0]
+            print(f"The least carbon light hour for {taxi_color} taxis is {lightest_hour}")
+            logger.info(f"The least carbon light hour for {taxi_color} taxis is {lightest_hour}")
 
-def create_monthly_co2_plot(yellow_months, green_months):
-    try:
-        logging.info("Creating monthly CO2 emissions plot")
-        
-        months = [x[0] for x in yellow_months]
-        yellow_totals = [x[1] for x in yellow_months]
-        green_totals = [x[1] for x in green_months]
-        
-        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        
-        plt.figure(figsize=(14, 8))
-        plt.plot(months, yellow_totals, marker='o', linewidth=3, markersize=8, 
-                label='Yellow Taxi', color='#FFD700', alpha=0.8)
-        plt.plot(months, green_totals, marker='s', linewidth=3, markersize=8, 
-                label='Green Taxi', color='#228B22', alpha=0.8)
-        
-        plt.title('NYC Taxi CO2 Emissions by Month (2024)', fontsize=16, fontweight='bold', pad=20)
-        plt.xlabel('Month', fontsize=12, fontweight='bold')
-        plt.ylabel('Total CO2 Emissions (kg)', fontsize=12, fontweight='bold')
-        plt.xticks(months, month_names, rotation=45)
-        plt.legend(fontsize=12, loc='upper right')
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        
-        ax = plt.gca()
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1000:.0f}K'))
-        
-        # saving the plot
-        plt.savefig('co2_emissions_by_month.png', dpi=300, bbox_inches='tight')
-        plt.show()
-        
-        logging.info("Monthly CO2 plot saved as 'co2_emissions_by_month.png'")
-        
-        return True
-        
+            #by day
+            heaviest_day = con.execute(f"""
+                SELECT trip_day_of_week FROM transform_trips WHERE taxi_type = '{taxi_color}'
+                GROUP BY 1 ORDER BY AVG(trip_co2_kgs) DESC LIMIT 1;""").fetchone()[0]
+            print(f"The most carbon heavy day for {taxi_color} taxis is {heaviest_day}")
+            logger.info(f"The most carbon heavy day for {taxi_color} taxis is {heaviest_day}")
+
+            lightest_day = con.execute(f"""
+                SELECT trip_day_of_week FROM transform_trips WHERE taxi_type = '{taxi_color}'
+                GROUP BY 1 ORDER BY AVG(trip_co2_kgs) ASC LIMIT 1;""").fetchone()[0]
+            print(f"The least carbon light day for {taxi_color} taxis is {lightest_day}")
+            logger.info(f"The least carbon light day for {taxi_color} taxis is {lightest_day}")
+
+            #by week
+            heaviest_week = con.execute(f"""
+                SELECT trip_week_number FROM transform_trips WHERE taxi_type = '{taxi_color}'
+                GROUP BY 1 ORDER BY AVG(trip_co2_kgs) DESC LIMIT 1;""").fetchone()[0]
+            print(f"The most carbon heavy week for {taxi_color} taxis is {heaviest_week}")
+            logger.info(f"The least carbon heavy week for {taxi_color} taxis is {heaviest_week}")
+
+            lightest_week = con.execute(f"""
+                SELECT trip_week_number FROM transform_trips WHERE taxi_type = '{taxi_color}'
+                GROUP BY 1 ORDER BY AVG(trip_co2_kgs) ASC LIMIT 1;""").fetchone()[0]
+            print(f"The least carbon light week for {taxi_color} taxis is {lightest_week}")
+            logger.info(f"The least carbon light week for {taxi_color} taxis is {lighest_week}")   
+
+            #by month of the year:
+            heaviest_month = con.execute(f"""
+                SELECT trip_month FROM transform_trips WHERE taxi_type = '{taxi_color}'
+                GROUP BY 1 ORDER BY AVG(trip_co2_kgs) DESC LIMIT 1;""").fetchone()[0]
+            print(f"The most carbon heavy month for {taxi_color} taxis is {heaviest_month}")
+            logger.info(f"The most carbon heavy month for {taxi_color} taxis is {heaviest_month}")
+
+            lightest_month = con.execute(f"""
+                SELECT trip_month FROM transform_trips WHERE taxi_type = '{taxi_color}'
+                GROUP BY 1 ORDER BY AVG(trip_co2_kgs) ASC LIMIT 1;""").fetchone()[0]
+            print(f"The least carbon light month for {taxi_color} taxis is {lightest_month}")
+            logger.info(f"The least carbon light month for {taxi_color} taxis is {lightest_month}")
+
+        plot_df = con.execute(f"""
+            SELECT
+                EXTRACT(year FROM pickup_datetime) AS year,
+                trip_month,
+                taxi_type,
+                SUM(trip_co2_kgs) AS total_co2
+                    FROM transform_trips
+                        WHERE EXTRACT(year FROM pickup_datetime) >= 2015
+                              GROUP BY year, trip_month, taxi_type
+                              ORDER BY year, trip_month, taxi_type;
+            """).fetchdf()
+            
+        #trip_month vs co2 emissions
+        plot_df['date'] = pd.to_datetime(plot_df['year'].astype(str) + '-' + plot_df['trip_month'].astype(str).str.zfill(2) + '-01')
+        pivot_df = plot_df.pivot_table(index='date', columns='taxi_type', values='total_co2', fill_value=0).sort_index()
+
+        plt.style.use('ggplot')
+        fig, ax = plt.subplots(figsize=(16, 8))
+        bar_width = 15
+        taxi_colors = {'yellow': '#F9DC5C', 'green': '#3BAF75'}
+        bar_offsets = {'yellow': -bar_width, 'green': bar_width}
+        for taxi in ['yellow', 'green']:
+            ax.bar(
+                pivot_df.index + pd.Timedelta(days=bar_offsets[taxi]),
+                pivot_df[taxi],
+                width=bar_width,
+                label=f"{taxi.title()} Taxi",
+                color=taxi_colors[taxi],
+                alpha=0.9,
+                edgecolor='black'
+            )
+
+        ax.set_title('NYC Taxi Monthly CO₂ Emissions (2015-2024)', fontsize=18, pad=20)
+        ax.set_xlabel('Month')
+        ax.set_ylabel('CO₂ Emissions (kg)')
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(180))
+        fig.autofmt_xdate(rotation=50)
+        ax.legend(loc='upper left')
+        ax.grid(visible=True, which='major', linestyle='-.', linewidth=1)
+        fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+        plot_filename = 'output/taxi_co2_emissions_2015to2024.png'
+        plt.savefig(plot_filename)
+        print(f"\nPlot has been successfully saved to {plot_filename}")
+        logger.info(f"Plot has been successfully saved to {plot_filename}")
+
     except Exception as e:
-        logging.error(f"Failed to create plot: {e}")
-        raise
+        print(f"There was an error during analysis: {e}")
+        logger.error(f"There was an error during analysis: {e}") 
+
+    finally:
+        if con:
+            con.close()
+            logger.info("Database connection closed")
 
 def main():
     try:
-        logging.info("Starting data analysis process")
-        
-        con = setup_database()
-        
-        print("NYC TAXI CO2 EMISSIONS ANALYSIS FOR 2024")
-        print("\n")
-        
+        con = duckdb.connect('taxi_data.duckdb', read_only=True)
+        logging.info("Database connection established")
         analyze_largest_carbon_trips(con)
-        print()
-        analyze_by_hour(con)
-        print()
-        analyze_by_day_of_week(con)
-        print()
-        analyze_by_week(con)
-        print()
-        yellow_months, green_months = analyze_by_month(con)
-        print()
-        
-        create_monthly_co2_plot(yellow_months, green_months)
-        
-        con.close()
-        logging.info("Data analysis completed successfully")
-        print("Analysis complete. Check 'co2_emissions_by_month.png' for the visualization.")
-        
     except Exception as e:
-        logging.error(f"Data analysis failed: {e}")
-        raise
+        print(f"Database error: {e}")
+        logging.error(f"Database error: {e}")
 
 if __name__ == "__main__":
     main()
