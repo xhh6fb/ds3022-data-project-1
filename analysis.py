@@ -1,6 +1,6 @@
 """
 Goals of this File:
-- Report on...
+- Report on:
   1) Single largest CO2 trip (yellow/green).
   2) Most/least carbon-heavy hours.
   3) Most/least carbon-heavy days of week.
