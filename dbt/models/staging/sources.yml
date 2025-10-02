@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: nyc_taxi
-    schema: main          # this is the DuckDB schema your tables are in
+    schema: main
     tables:
       - name: vehicle_emissions
       - name: yellow_clean
