@@ -10,132 +10,109 @@ Goals of this File:
 
 import duckdb
 import logging
-import os
-
-os.makedirs('logs', exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='logs/clean.log',
+    filename='clean.log',
     filemode='a'
 )
 logger = logging.getLogger(__name__)
 
 def setup_database():
     try:
-        conn = duckdb.connect(database='taxi_data.duckdb', read_only=False)
+        con = duckdb.connect(database='taxi_data.duckdb', read_only=False)
         logger.info("Connected to DuckDB instance")
-        return conn
+        return con
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
         raise
 
-def clean_yellow_trips(conn):
+def clean_trips(con):
 
     try:
-        logger.info("Cleaning Yellow taxi trips")
+        logger.info("Cleaning taxi trips")
+        trips = ['yellow_trips', 'green_trips']
 
-        # remove duplicates
-        conn.execute("""
-            CREATE TABLE yellow_trips_temp AS 
-            SELECT DISTINCT * FROM yellow_trips
-        """)
-        conn.execute("DROP TABLE yellow_trips")
-        conn.execute("ALTER TABLE yellow_trips_temp RENAME TO yellow_trips")
+        for trip in trips:
+            logging.info(f"Cleaning for {trip}")
 
-        # remove trips with 0 passengers
-        before_passengers = conn.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
-        conn.execute("DELETE FROM yellow_trips WHERE passenger_count = 0 OR passenger_count IS NULL")
-        after_passengers = conn.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
-        logger.info(f"Removed {before_passengers - after_passengers:,} trips with 0 passengers")
+            # remove duplicates
+            con.execute(f"""
+                CREATE OR REPLACE TABLE {trip} AS
+                SELECT DISTINCT * FROM {trip};
+            """)
+            logging.info(f"Duplicates have been removed for {trip}")
 
-        # remove trips with 0 miles
-        before_distance = after_passengers
-        conn.execute("DELETE FROM yellow_trips WHERE trip_distance = 0 OR trip_distance IS NULL")
-        after_distance = conn.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
-        logger.info(f"Removed {before_distance - after_distance:,} trips with 0 miles")
+            # remove trips with 0 passengers
+            before_passengers = con.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
+            con.execute(f"""
+                DELETE FROM {trip} WHERE passenger_count = 0;
+            """)
+            after_passengers = con.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
+            logger.info(f"Removed {before_passengers - after_passengers:,} trips with 0 passengers")
 
-        # remove trips > 100 miles
-        before_long = after_distance
-        conn.execute("DELETE FROM yellow_trips WHERE trip_distance > 100")
-        after_long = conn.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
-        logger.info(f"Removed {before_long - after_long:,} trips > 100 miles")
+            # remove trips with 0 or negative miles
+            before_distance = after_passengers
+            con.execute(f"""
+                DELETE FROM {trip} WHERE trip_distance <= 0;
+            """)
+            after_distance = con.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
+            logger.info(f"Removed {before_distance - after_distance:,} trips with 0 miles")
 
-        # remove trips > 24 hours or invalid duration
-        before_duration = after_long
-        conn.execute("""
-            DELETE FROM yellow_trips 
+            # remove trips > 100 miles
+            before_long = after_distance
+            con.execute(f"""
+                DELETE FROM {trip} WHERE trip_distance > 100;
+            """)
+            after_long = con.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
+            logger.info(f"Removed {before_long - after_long:,} trips > 100 miles")
+
+            # remove trips > 24 hours or invalid duration
+            before_duration = after_long
+            con.execute(f"""
+            DELETE FROM {trip}
             WHERE EXTRACT('epoch' FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) > 86400
-               OR EXTRACT('epoch' FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) <= 0
-        """)
-        after_duration = conn.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
-        logger.info(f"Removed {before_duration - after_duration:,} trips > 24 hours or invalid duration")
+               OR EXTRACT('epoch' FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) <= 0;
+            """)
+            after_duration = con.execute("SELECT COUNT(*) FROM yellow_trips").fetchone()[0]
+            logger.info(f"Removed {before_duration - after_duration:,} trips > 24 hours or invalid duration")
 
-        final_count = after_duration
-        logger.info(f"Yellow trips cleaning completed. Final count: {final_count:,}")
-        return final_count
+            final_count = after_duration
+            logger.info(f"{trip} cleaning completed. Final count: {final_count:,}")
+            return final_count
 
-    except Exception as e:
-        logger.error(f"Failed to clean yellow trips: {e}")
-        raise
+            logger.info("Verifying cleaning results")
 
-def clean_green_trips(conn):
+            zero_passenger = con.execute(f"SELECT COUNT(*) FROM {table} WHERE passenger_count = 0;").fetchone()[0]
+            print(f"For {table}, trips with 0 passengers: {zero_passenger}")
+            logging.info(f"For {table}, trips with 0 passengers: {zero_passenger}")
 
-    try:
-        logger.info("Cleaning Green taxi trips")
+            zero_distance = con.execute(f"SELECT COUNT(*) FROM {table} WHERE trip_distance <= 0;").fetchone()[0]
+            print(f"For {table}, trips with 0 or negative distance: {zero_distance}")
+            logging.info(f"For {table}, trips with 0 or negative distance: {zero_distance}")
 
-        # remove duplicates
-        conn.execute("""
-            CREATE TABLE green_trips_temp AS 
-            SELECT DISTINCT * FROM green_trips
-        """)
-        conn.execute("DROP TABLE green_trips")
-        conn.execute("ALTER TABLE green_trips_temp RENAME TO green_trips")
+            long_distance = con.execute(f"SELECT COUNT (*) FROM {table} WHERE trip_distance > 100;").fetchone()[0]
+            print(f"For {table}, trips with distance over 100 miles: {long_distance}")
+            logging.info(f"For {table}, trips with distance over 100 miles: {long_distance}")
 
-        # remove trips with 0 passengers
-        before_passengers = conn.execute("SELECT COUNT(*) FROM green_trips").fetchone()[0]
-        conn.execute("DELETE FROM green_trips WHERE passenger_count = 0 OR passenger_count IS NULL")
-        after_passengers = conn.execute("SELECT COUNT(*) FROM green_trips").fetchone()[0]
-        logger.info(f"Removed {before_passengers - after_passengers:,} trips with 0 passengers")
+            long_duration = con.execute(f"SELECT COUNT(*) FROM {table} WHERE (julian(dropoff_datetime) - julian(pickup_datetime)) * 86400 > 86400;").fetchone()[0]
+            print(f"For {table}, trips lasting more than 1 day: {long_duration}")
+            logging.info(f"For {table}, trips lasting more than 1 day: {long_duration}")
 
-        # remove trips with 0 miles
-        before_distance = after_passengers
-        conn.execute("DELETE FROM green_trips WHERE trip_distance = 0 OR trip_distance IS NULL")
-        after_distance = conn.execute("SELECT COUNT(*) FROM green_trips").fetchone()[0]
-        logger.info(f"Removed {before_distance - after_distance:,} trips with 0 miles")
-
-        # remove trips > 100 miles
-        before_long = after_distance
-        conn.execute("DELETE FROM green_trips WHERE trip_distance > 100")
-        after_long = conn.execute("SELECT COUNT(*) FROM green_trips").fetchone()[0]
-        logger.info(f"Removed {before_long - after_long:,} trips > 100 miles")
-
-        # Remove trips > 24 hours or invalid duration
-        before_duration = after_long
-        conn.execute("""
-            DELETE FROM green_trips 
-            WHERE EXTRACT('epoch' FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) > 86400
-               OR EXTRACT('epoch' FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) <= 0
-        """)
-        after_duration = conn.execute("SELECT COUNT(*) FROM green_trips").fetchone()[0]
-        logger.info(f"Removed {before_duration - after_duration:,} trips > 24 hours or invalid duration")
-
-        final_count = after_duration
-        logger.info(f"Green trips cleaning completed. Final count: {final_count:,}")
-        return final_count
+            logging.info(f" VERIFICATION TESTS COMPLETED for {table} table -- Cleaning COMPLETED --")
 
     except Exception as e:
-        logger.error(f"Failed to clean green trips: {e}")
+        logger.error(f"Failed to clean {trip}: {e}")
         raise
 
 def verify_cleaning(conn):
-    
+
     try:
-        logger.info("Verifying cleaning results...")
+        logger.info("Verifying cleaning results")
 
         yellow_issues = conn.execute("""
-            SELECT 
+            SELECT
                 COUNT(*) FILTER (WHERE passenger_count = 0) as zero_passengers,
                 COUNT(*) FILTER (WHERE trip_distance = 0) as zero_distance,
                 COUNT(*) FILTER (WHERE trip_distance > 100) as long_distance,
@@ -144,7 +121,7 @@ def verify_cleaning(conn):
         """).fetchone()
 
         green_issues = conn.execute("""
-            SELECT 
+            SELECT
                 COUNT(*) FILTER (WHERE passenger_count = 0) as zero_passengers,
                 COUNT(*) FILTER (WHERE trip_distance = 0) as zero_distance,
                 COUNT(*) FILTER (WHERE trip_distance > 100) as long_distance,
@@ -175,19 +152,12 @@ def main():
     try:
         logger.info("Starting data cleaning process")
 
-        conn = setup_database()
+        con = setup_database()
 
-        # clean tables
-        final_yellow = clean_yellow_trips(conn)
-        final_green = clean_green_trips(conn)
+        clean_trips(con)
+        verify_cleaning(con)
 
-        # verify cleaning
-        verify_cleaning(conn)
-
-        logger.info("Data cleaning completed successfully!")
-        print(f"Final Counts -> Yellow: {final_yellow:,}, Green: {final_green:,}")
-
-        conn.close()
+        con.close()
         logger.info("Closed DuckDB connection")
 
     except Exception as e:
