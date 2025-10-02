@@ -27,19 +27,19 @@ logging.basicConfig(
 
 def setup_database():
     try:
-        conn = duckdb.connect('taxi_data.duckdb', read_only=True)
+        con = duckdb.connect('taxi_data.duckdb', read_only=True)
         logging.info("Database connection established")
-        return conn
+        return con
     except Exception as e:
         logging.error(f"Database setup failed: {e}")
         raise
 
-def analyze_largest_carbon_trips(conn):
+def analyze_largest_carbon_trips(con):
     try:
         logging.info("Analyzing largest carbon producing trips")
         
         # yellow taxi largest trip
-        yellow_max = conn.execute("""
+        yellow_max = con.execute("""
             SELECT trip_distance, trip_co2_kgs, tpep_pickup_datetime, tpep_dropoff_datetime
             FROM yellow_trips 
             WHERE trip_co2_kgs = (SELECT MAX(trip_co2_kgs) FROM yellow_trips)
@@ -47,7 +47,7 @@ def analyze_largest_carbon_trips(conn):
         """).fetchone()
         
         # green taxi largest trip
-        green_max = conn.execute("""
+        green_max = con.execute("""
             SELECT trip_distance, trip_co2_kgs, lpep_pickup_datetime, lpep_dropoff_datetime
             FROM green_trips 
             WHERE trip_co2_kgs = (SELECT MAX(trip_co2_kgs) FROM green_trips)
@@ -68,12 +68,12 @@ def analyze_largest_carbon_trips(conn):
         logging.error(f"Failed to analyze largest trips: {e}")
         raise
 
-def analyze_by_hour(conn):
+def analyze_by_hour(con):
     try:
         logging.info("Analyzing emissions by hour of day")
         
         # yellow taxi by hour
-        yellow_hours = conn.execute("""
+        yellow_hours = con.execute("""
             SELECT hour_of_day, AVG(trip_co2_kgs) as avg_co2
             FROM yellow_trips 
             WHERE trip_co2_kgs IS NOT NULL
@@ -82,7 +82,7 @@ def analyze_by_hour(conn):
         """).fetchall()
         
         # green taxi by hour
-        green_hours = conn.execute("""
+        green_hours = con.execute("""
             SELECT hour_of_day, AVG(trip_co2_kgs) as avg_co2
             FROM green_trips 
             WHERE trip_co2_kgs IS NOT NULL
@@ -114,12 +114,12 @@ def analyze_by_hour(conn):
         logging.error(f"Failed to analyze by hour: {e}")
         raise
 
-def analyze_by_day_of_week(conn):
+def analyze_by_day_of_week(con):
     try:
         logging.info("Analyzing emissions by day of week")
         
         # yellow taxi by day of week (key: 0 is sunday, 6 is saturday)
-        yellow_days = conn.execute("""
+        yellow_days = con.execute("""
             SELECT day_of_week, AVG(trip_co2_kgs) as avg_co2
             FROM yellow_trips 
             WHERE trip_co2_kgs IS NOT NULL
@@ -128,7 +128,7 @@ def analyze_by_day_of_week(conn):
         """).fetchall()
         
         # green taxi by day of week
-        green_days = conn.execute("""
+        green_days = con.execute("""
             SELECT day_of_week, AVG(trip_co2_kgs) as avg_co2
             FROM green_trips 
             WHERE trip_co2_kgs IS NOT NULL
@@ -159,12 +159,12 @@ def analyze_by_day_of_week(conn):
         logging.error(f"Failed to analyze by day of week: {e}")
         raise
 
-def analyze_by_week(conn):
+def analyze_by_week(con):
     try:
         logging.info("Analyzing emissions by week of year")
         
         # yellow taxi by week
-        yellow_weeks = conn.execute("""
+        yellow_weeks = con.execute("""
             SELECT week_of_year, AVG(trip_co2_kgs) as avg_co2
             FROM yellow_trips 
             WHERE trip_co2_kgs IS NOT NULL
@@ -173,7 +173,7 @@ def analyze_by_week(conn):
         """).fetchall()
         
         # green taxi by week
-        green_weeks = conn.execute("""
+        green_weeks = con.execute("""
             SELECT week_of_year, AVG(trip_co2_kgs) as avg_co2
             FROM green_trips 
             WHERE trip_co2_kgs IS NOT NULL
@@ -202,12 +202,12 @@ def analyze_by_week(conn):
         logging.error(f"Failed to analyze by week: {e}")
         raise
 
-def analyze_by_month(conn):
+def analyze_by_month(con):
     try:
         logging.info("Analyzing emissions by month")
         
         # yellow taxi by month
-        yellow_months = conn.execute("""
+        yellow_months = con.execute("""
             SELECT month_of_year, SUM(trip_co2_kgs) as total_co2, AVG(trip_co2_kgs) as avg_co2
             FROM yellow_trips 
             WHERE trip_co2_kgs IS NOT NULL
@@ -216,7 +216,7 @@ def analyze_by_month(conn):
         """).fetchall()
         
         # green taxi by month
-        green_months = conn.execute("""
+        green_months = con.execute("""
             SELECT month_of_year, SUM(trip_co2_kgs) as total_co2, AVG(trip_co2_kgs) as avg_co2
             FROM green_trips 
             WHERE trip_co2_kgs IS NOT NULL
@@ -292,25 +292,25 @@ def main():
     try:
         logging.info("Starting data analysis process")
         
-        conn = setup_database()
+        con = setup_database()
         
         print("NYC TAXI CO2 EMISSIONS ANALYSIS FOR 2024")
         print("\n")
         
-        analyze_largest_carbon_trips(conn)
+        analyze_largest_carbon_trips(con)
         print()
-        analyze_by_hour(conn)
+        analyze_by_hour(con)
         print()
-        analyze_by_day_of_week(conn)
+        analyze_by_day_of_week(con)
         print()
-        analyze_by_week(conn)
+        analyze_by_week(con)
         print()
-        yellow_months, green_months = analyze_by_month(conn)
+        yellow_months, green_months = analyze_by_month(con)
         print()
         
         create_monthly_co2_plot(yellow_months, green_months)
         
-        conn.close()
+        con.close()
         logging.info("Data analysis completed successfully")
         print("Analysis complete. Check 'co2_emissions_by_month.png' for the visualization.")
         
