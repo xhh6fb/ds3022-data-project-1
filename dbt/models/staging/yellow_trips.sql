@@ -17,20 +17,13 @@ select
   total_amount,
   'yellow' as cab_color,
 
-  -- CO₂ (kg): distance * grams_per_mile / 1000, fallback to overall avg if needed
-  round(
-    trip_distance *
-    coalesce((select y_gpm from factors), (select default_gpm from factors)) / 1000.0,
-    6
-  ) as trip_co2_kgs,
+  round(trip_distance * coalesce((select y_gpm from factors), (select default_gpm from factors)) / 1000.0, 6) as trip_co2_kgs,
 
-  -- Average MPH
   case
     when (epoch(dropoff_datetime) - epoch(pickup_datetime)) > 0
       then trip_distance / ((epoch(dropoff_datetime) - epoch(pickup_datetime)) / 3600.0)
   end as avg_mph,
 
-  -- Time buckets
   date_part('hour', pickup_datetime) as hour_of_day,
   dayofweek(pickup_datetime) as day_of_week,
   date_part('week', pickup_datetime) as week_of_year,
