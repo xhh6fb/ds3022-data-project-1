@@ -1,12 +1,12 @@
 version: 2
 models:
-  - name: stg_yellow_trips
+  - name: yellow_trips
     columns:
       - name: pickup_datetime
         tests: [not_null]
       - name: trip_co2_kgs
         tests: [not_null]
-  - name: stg_green_trips
+  - name: green_trips
     columns:
       - name: pickup_datetime
         tests: [not_null]
